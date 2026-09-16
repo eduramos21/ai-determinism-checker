@@ -26,3 +26,9 @@ export {
   type RecordedJudgeCall,
   RecordingJudgeClient,
 } from "./judge.js";
+export {
+  type DeterminismMetricsInput,
+  type DeterminismMetricsRow,
+  computeMetrics,
+  writeMetrics,
+} from "./metrics.js";
