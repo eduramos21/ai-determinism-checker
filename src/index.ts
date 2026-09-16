@@ -15,3 +15,6 @@ export {
   type DeterminismResult,
   determinismResultPassed,
 } from "./result.js";
+export { report } from "./reporter.js";
+export { AllowedSetStrategy } from "./strategies/allowed-set.js";
+export { CrossFieldConsistencyStrategy } from "./strategies/cross-field-consistency.js";
