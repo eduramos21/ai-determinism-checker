@@ -37,9 +37,12 @@ export async function executeDeterminismTestCase<T>(
   testCase: DeterminismTestCase<T>,
 ): Promise<DeterminismResult<T>> {
   const runs = await repeat(testCase.producer, testCase.n);
-  const outcomes = testCase.strategies.map((strategy) => ({
-    name: strategy.name(),
-    violations: strategy.check(runs),
-  }));
+  const outcomes = [];
+  for (const strategy of testCase.strategies) {
+    outcomes.push({
+      name: strategy.name(),
+      violations: await strategy.check(runs),
+    });
+  }
   return { caseId: testCase.id, runs, outcomes };
 }

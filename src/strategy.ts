@@ -3,10 +3,11 @@
  *
  * `check` receives ALL N runs, not one, so a strategy can compare runs
  * against each other. An empty violation list means the rule passed.
+ * May be async (e.g. an LLM-judge strategy makes a network call).
  */
 export interface Strategy<T> {
   name(): string;
-  check(runs: readonly T[]): Violation[];
+  check(runs: readonly T[]): Violation[] | Promise<Violation[]>;
 }
 
 /**
@@ -32,16 +33,19 @@ export const CROSS_RUN = -1;
 export abstract class PerRunStrategy<T> implements Strategy<T> {
   abstract name(): string;
 
-  protected abstract checkRun(run: T, runIndex: number): Violation | undefined;
+  protected abstract checkRun(
+    run: T,
+    runIndex: number,
+  ): Violation | undefined | Promise<Violation | undefined>;
 
-  check(runs: readonly T[]): Violation[] {
+  async check(runs: readonly T[]): Promise<Violation[]> {
     const violations: Violation[] = [];
-    runs.forEach((run, index) => {
-      const violation = this.checkRun(run, index);
+    for (let index = 0; index < runs.length; index++) {
+      const violation = await this.checkRun(runs[index], index);
       if (violation) {
         violations.push(violation);
       }
-    });
+    }
     return violations;
   }
 }
