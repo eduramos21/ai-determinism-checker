@@ -340,6 +340,78 @@ export class HttpJudgeClient implements JudgeClient {
 }
 ```
 
+#### Implementing the other end in a workflow tool (e.g. n8n)
+
+`HttpJudgeClient` above is the whole consumer side — it just needs a URL and a bearer token. The
+part it doesn't show is the workflow behind that URL. If you're hosting the judge in a tool like
+n8n (so the model credential never touches your test repo), the workflow needs to implement the
+same contract on the other end:
+
+```
+POST <judge-url>
+Authorization: Bearer <shared-secret>
+Content-Type: application/json
+
+{ "content": "<text to grade>", "criteria": "<what makes it acceptable>" }
+
+200 {"pass": true|false, "reason": "..."}    a real verdict
+400 {"error": "invalid_input", ...}          content or criteria missing
+502 {"error": "model_call_failed", ...}      could not render an opinion
+```
+
+Build it as five nodes:
+
+1. **Webhook node** — `POST`, header auth checking the bearer token, response mode set to
+   respond from a later node (not immediately).
+2. **Validate input** — an `IF` node: `body.content` not empty AND `body.criteria` not empty. On
+   false, go straight to a "respond 400" node.
+3. **Judge node** — an LLM/agent node with the model **pinned** (don't leave it on "latest") and
+   **`temperature: 0`** — the stochasticity under test belongs to the subject, not the
+   instrument. System prompt is the judge prompt below; force a structured output parser for
+   `{pass: boolean, reason: string}` rather than parsing prose.
+4. **Guard node** — a small Code node that type-checks the parsed output before it's trusted:
+
+   ```js
+   const raw = $json;
+   const out = raw.output ?? raw;
+   const pass = out ? out.pass : undefined;
+   const reason = out ? out.reason : undefined;
+   if (typeof pass !== 'boolean' || typeof reason !== 'string') {
+     return [{ json: { _ok: false, error: 'invalid_verdict', detail: JSON.stringify(out).slice(0, 500) } }];
+   }
+   return [{ json: { _ok: true, pass, reason } }];
+   ```
+
+   This is belt-and-braces on top of the structured parser: a malformed verdict becomes a 502
+   response, never a silent `pass: false`.
+5. **Respond nodes** — three of them: 200 with `{pass, reason}` when the guard says `_ok: true`;
+   502 when the guard says `_ok: false` or the judge node itself errored; 400 from step 2.
+
+Judge system prompt (use as-is):
+
+> You are a strict evaluator. Decide whether CONTENT satisfies CRITERIA. Judge only against the
+> criteria given; do not invent extra requirements. Return only the structured object
+> `{"pass": boolean, "reason": string}`. `pass` is true only if the content genuinely meets the
+> criteria; `reason` is one short sentence justifying the decision. Never output anything but the
+> object.
+
+Don't drop *"Judge only against the criteria given; do not invent extra requirements"* — without
+it, evaluator models reliably add their own standards and fail outputs that satisfy every stated
+criterion. User message carries nothing but the two labelled inputs:
+
+```
+Content:
+{{ content }}
+
+Criteria:
+{{ criteria }}
+```
+
+Verify the workflow by itself with `curl` before pointing any client at it — two known-pass
+pairs, two known-fail pairs, one request with a missing field (expect 400), and one with the
+model credential temporarily broken (expect 502). Re-run this set whenever the workflow's prompt
+or model changes.
+
 Whichever shape you pick:
 
 - **Pin the model version and set `temperature: 0`.** An unpinned, non-zero-temperature judge
