@@ -1,0 +1,40 @@
+{
+  "name": "ai-determinism-checker",
+  "version": "0.1.0",
+  "description": "Generic, driver-agnostic library for testing that AI/LLM feature output stays within defined bounds across repeated runs.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "example": "tsx examples/basic-usage.ts"
+  },
+  "license": "MIT",
+  "author": "Eduardo Ramos",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eduramos21/ai-determinism-checker.git"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "determinism",
+    "testing",
+    "genai"
+  ],
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.11",
+    "tsx": "^4.19.2"
+  }
+}
